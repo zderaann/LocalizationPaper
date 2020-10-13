@@ -60,7 +60,7 @@ hol = hololensReg.Location(k, :);
 minB = 0;
 
 
-for B = 0:2000 
+for B = 0:1500 
     i = uint64(a * k + B); 
     vic = pcVicom.Location(i, :);
     Rvic = [vicom.Var8(i), vicom.Var9(i), vicom.Var10(i)];
@@ -124,7 +124,7 @@ for i = 1:hololensReg.Count
 end
 
 figure();
-plot(0:1000 , vals, 'b', 0:1000 , initvals, 'r');
+plot(0:1500 , vals, 'b', 0:1500 , initvals, 'r');
 
 
 
