@@ -60,7 +60,7 @@ hol = hololensReg.Location(k, :);
 minB = 0;
 
 
-for B = 0:1000 
+for B = 0:2000 
     i = uint64(a * k + B); 
     vic = pcVicom.Location(i, :);
     Rvic = [vicom.Var8(i), vicom.Var9(i), vicom.Var10(i)];
@@ -113,17 +113,18 @@ ylabel("y");
 zlabel("z");
 title('Registered Hololens tracking and Vicom tracking after tuning');
 
+%% -----------------------------------------------------
 %kresleni car
 j = uint64(a * k + minB); 
 vic = pcVicom.Location(j, :);
 Rvic = [vicom.Var8(j), vicom.Var9(j), vicom.Var10(j)];
 for i = 1:hololensReg.Count
-    P = vic(i,:)' + euler2mat(Rv(i,:)) * [minpar(1) minpar(2) minpar(3)]';
-    plot([vic(i, 1), P(1)], [vic(i, 2), P(2)], [vic(i, 3), P(3)], 'r')
+    P = vic(i,:)' + euler2mat(Rvic(i,:)) * [minpar(1) minpar(2) minpar(3)]';
+    plot3([vic(i, 1), P(1)], [vic(i, 2), P(2)], [vic(i, 3), P(3)], 'r')
 end
 
 figure();
-plot(0:500, vals, 'b', 0:500, initvals, 'r');
+plot(0:1000 , vals, 'b', 0:1000 , initvals, 'r');
 
 
 
