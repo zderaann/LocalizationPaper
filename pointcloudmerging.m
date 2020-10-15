@@ -1,5 +1,6 @@
 croppingStart = 100;
 croppingEnd = 0;
+BMax = 1500;
 vicom = readtable('./Vicom_2020_08_20/2020_08_20_Vicon_HoloLens_Session/seq1.txt');
 pvhololens = readtable('./Vicom_2020_08_20/HoloLensRecording__2020_08_20__08_36_27/pv.csv');
 
@@ -60,7 +61,7 @@ hol = hololensReg.Location(k, :);
 minB = 0;
 
 
-for B = 0:1500 
+for B = 0:BMax 
     i = uint64(a * k + B); 
     vic = pcVicom.Location(i, :);
     Rvic = [vicom.Var8(i), vicom.Var9(i), vicom.Var10(i)];
@@ -114,18 +115,32 @@ zlabel("z");
 title('Registered Hololens tracking and Vicom tracking after tuning');
 
 %% -----------------------------------------------------
+hold on;
 %kresleni car
-%j = uint64(a * k + minB); 
-%vic = pcVicom.Location(j, :);
-%Rvic = [vicom.Var8(j), vicom.Var9(j), vicom.Var10(j)];
-%for i = 1:hololensReg.Count
-%    P = vic(i,:)' + euler2mat(Rvic(i,:)) * [minpar(1) minpar(2) minpar(3)]';
-%    plot3([vic(i, 1), P(1)], [vic(i, 2), P(2)], [vic(i, 3), P(3)], 'r')
-%end
+j = uint64(a * k + minB); 
+vic = pcVicom.Location(j, :);
+Rvic = [vicom.Var8(j), vicom.Var9(j), vicom.Var10(j)];
+for i = 1:hololensReg.Count
+    P = vic(i,:)' + euler2mat(Rvic(i,:)) * [minpar(1) minpar(2) minpar(3)]';
+    plot3([vic(i, 1), P(1)], [vic(i, 2), P(2)], [vic(i, 3), P(3)], 'r')
+end
 
+%%
 figure();
-plot(0:1500 , vals, 'b', 0:1500 , initvals, 'r');
+plot(0:BMax , vals, 'b', 0:BMax , initvals, 'r');
 
+
+%%
+
+ivic = uint64(a * k + 849); 
+hold on;
+Pvic = pcVicom.Location(ivic, :);
+Phol = hololensReg.Location(k, :);
+
+
+for i = 1:hololensReg.Count
+    plot3([Pvic(i, 1), Phol(i, 1)], [Pvic(i, 2), Phol(i, 2)], [Pvic(i, 3), Phol(i, 3)], 'r')
+end
 
 
 
