@@ -1,6 +1,7 @@
 croppingStart = 100;
 croppingEnd = 0;
-BMax = 1500;
+Binit = 120;
+BMax = 160;
 vicom = readtable('./Vicom_2020_08_20/2020_08_20_Vicon_HoloLens_Session/seq1.txt');
 pvhololens = readtable('./Vicom_2020_08_20/HoloLensRecording__2020_08_20__08_36_27/pv.csv');
 
@@ -45,7 +46,7 @@ ylabel("y");
 zlabel("z");
 title(['Registered Hololens tracking and Vicom tracking, ax = ', num2str(ax), ', ay = ', num2str(ay), ', az = ', num2str(az)]);
 
-
+%% --------------------------------------------------------------
 
 numHolol = size(pvhololens,1);
 numVicom = size(vicom,1);
@@ -55,20 +56,30 @@ indexes = [];
 vals = [];
 initvals = [];
 
-a = 6.66667;
-k = 1 : hololensReg.Count;
+
+% holFPS = pvhololens.Timestamp(end - croppingEnd) - pvhololens.Timestamp(1 + croppingStart);
+% holFPS = time / 10^7;
+% holFPS = size(pvhololens,1) / holFPS;
+% a = 100/holFPS;
+% k = 1 : hololensReg.Count;
+
 hol = hololensReg.Location(k, :);
 minB = 0;
 
+timediff = pvhololens.Timestamp(2 + croppingStart:end - croppingEnd) - pvhololens.Timestamp(1 + croppingStart:end - croppingEnd -1);
+timediff = timediff / 10^7;
+cs = cumsum([0; timediff]);
+cs  = round(cs * 100);
 
-for B = 0:BMax 
-    i = uint64(a * k + B); 
+
+for B = Binit:BMax 
+    i = cs + B; 
     vic = pcVicom.Location(i, :);
     Rvic = [vicom.Var8(i), vicom.Var9(i), vicom.Var10(i)];
     
     fun = @(par)closerTransformation([par(1) par(2) par(3)]', par(4), euler2mat([par(5) par(6) par(7)]), [par(8) par(9) par(10)]', vic, Rvic, hol);
     initpar = [0 0 0 1 0 0 0 0 0 0];
-    options = optimset( 'MaxFunEvals', 1000 * 16);
+    %options = optimset( 'MaxFunEvals', 1000 * 16);
     [bestpar, bestval] = fminsearch(fun, initpar, options);
     
     %t, rho, S, d, C, Rv, D
@@ -77,9 +88,10 @@ for B = 0:BMax
     params = [params bestpar];
     vals = [vals bestval];
     
-    if B == 0
+    if B == Binit
       minpar = bestpar;
       minval = bestval;
+      minB = B;
     end
     
     if bestval < minval
@@ -105,8 +117,14 @@ for i = 1:hololensReg.Count
 end
 
 pcHol = pointCloud(holtrans);
+%% ---------------------------------------------------------------------------
+
+
+
 
 figure();
+%%
+
 pcshowpair(pcHol, pcVicom, 'MarkerSize', 50);
 axis equal;
 xlabel("x");
@@ -114,34 +132,40 @@ ylabel("y");
 zlabel("z");
 title('Registered Hololens tracking and Vicom tracking after tuning');
 
-%% -----------------------------------------------------
+%%
 hold on;
 %kresleni car
-j = uint64(a * k + minB); 
+j = uint64(cs + minB); 
 vic = pcVicom.Location(j, :);
-Rvic = [vicom.Var8(j), vicom.Var9(j), vicom.Var10(j)];
 for i = 1:hololensReg.Count
-    P = vic(i,:)' + euler2mat(Rvic(i,:)) * [minpar(1) minpar(2) minpar(3)]';
-    plot3([vic(i, 1), P(1)], [vic(i, 2), P(2)], [vic(i, 3), P(3)], 'r')
+    plot3([vic(i, 1), holtrans(i,1)], [vic(i, 2), holtrans(i,2)], [vic(i, 3), holtrans(i,3)], 'r')
 end
 
 %%
 figure();
-plot(0:BMax , vals, 'b', 0:BMax , initvals, 'r');
+plot(Binit:BMax , vals, 'b', Binit:BMax , initvals, 'r');
 
 
 %%
-
-ivic = uint64(a * k + 849); 
-hold on;
-Pvic = pcVicom.Location(ivic, :);
-Phol = hololensReg.Location(k, :);
-
-
-for i = 1:hololensReg.Count
-    plot3([Pvic(i, 1), Phol(i, 1)], [Pvic(i, 2), Phol(i, 2)], [Pvic(i, 3), Phol(i, 3)], 'r')
-end
-
+% figure();
+% pcshowpair(hololensReg, pcVicom, 'MarkerSize', 50);
+% axis equal;
+% xlabel("x");
+% ylabel("y");
+% zlabel("z");
+% title(['Registered Hololens tracking and Vicom tracking, ax = ', num2str(ax), ', ay = ', num2str(ay), ', az = ', num2str(az)]);
+% 
+% 
+% ivic = uint64(cs + 200); 
+% hold on;
+% Pvic = pcVicom.Location(ivic, :);
+% Phol = hololensReg.Location(k, :);
+% 
+% 
+% for i = 1:hololensReg.Count
+%     plot3([Pvic(i, 1), Phol(i, 1)], [Pvic(i, 2), Phol(i, 2)], [Pvic(i, 3), Phol(i, 3)], 'r')
+% end
+% 
 
 
 
@@ -180,7 +204,34 @@ end
 % 
 % end
 %%  -------------------------------------------------------------------------------------------
+holCheck = pcHoloLens.Location(k, :);
 
+rho = minpar(4);
+St = euler2mat([minpar(5) minpar(6) minpar(7)])';
+Rii = R(1:3, 1:3) * tform.Rotation;
+T = St * tform.Translation' - [minpar(8) minpar(9) minpar(10)]';
+
+for i = 1:hololensReg.Count
+    holCheck(i,:) = 1/rho * St *  (holCheck(i,:) * Rii)' + T;
+end
+
+pcHolCheck = pointCloud(holCheck);
+
+figure();
+pcshowpair(pcHolCheck, pcVicom, 'MarkerSize', 50);
+axis equal;
+xlabel("x");
+ylabel("y");
+zlabel("z");
+title('Registered Hololens tracking and Vicom tracking after tuning');
+
+
+%%
+hold on;
+
+plot3(pcHol.Location(:, 1), pcHol.Location(:, 2), pcHol.Location(:, 3), 'ro');
+
+%% -------------------------------------------------------------------------------------------
 function res = closerTransformation(t, rho, S, d, C, Rv, D)
 %     C-known
 %     R(e)-known
@@ -196,9 +247,10 @@ function res = closerTransformation(t, rho, S, d, C, Rv, D)
     for i = 1:num
         R = euler2mat(Rv(i,:));
         f = C(i,:)' + R * t - (1/rho) * S' * D(i,:)' - d;
-        res = res + norm(f);
+        res = res + norm(f)^2;
     end
     
+    res = res + 10 * norm(t) + 10 * norm(d);
     %sum(norm(C + R*t - 1/ro * S' * D - d))
 end
 
