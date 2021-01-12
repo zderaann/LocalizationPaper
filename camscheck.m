@@ -25,7 +25,7 @@ vlc_rr = readtable([folder, 'vlc_rr.csv']);
 
 
 
-for i = 1:1
+for i = 1:3
 %DEPTH
     [d_FrameToOrigin, d_CameraViewTransform] = loadData('long_throw_depth\', depthnames{i}, '.pgm', depthhololens);
       
@@ -57,21 +57,28 @@ function [FrameToOrigin, CameraViewTransform] = loadData(prefix, name, sufix, da
                               row.CameraViewTransform_m31 row.CameraViewTransform_m32 row.CameraViewTransform_m33 row.CameraViewTransform_m34;
                               row.CameraViewTransform_m41 row.CameraViewTransform_m42 row.CameraViewTransform_m43 row.CameraViewTransform_m44];
       
-    cameraPoints = [[diag([1 1 -1]) * 0.05; [0 0 0]] ones(4,1)];            
+    cameraPointsInWorld = [[diag([1 1 -1]) * 0.05; [0 0 0]] ones(4,1)];            
     transformedCamPoints = zeros(5,3);
     %CamTran = [[inv(CameraViewTransform(1:3, 1:3));0 0 0] [0; 0; 0; 1]];
     CamTran = [[CameraViewTransform(1:3, 1:3);0 0 0] [0; 0; 0; 1]];
     F2O = [[FrameToOrigin(1:3, 1:3);0 0 0] [0; 0; 0; 1]];
     %translation = FrameToOrigin(4,:) + CameraViewTransform(4,:);
-    translation = CameraViewTransform(4,:);
+    %translation = CameraViewTransform(4,:);
+    translation = FrameToOrigin(4,:);
+    D2C = inv(CameraViewTransform)'
+    
+    O2D = FrameToOrigin';
     for m = 1:4
       %cameraPoints(m, :) =  cameraPoints(m, :)  * (FrameToOrigin * CamTran);
-      cameraPoints(m, :) =  cameraPoints(m, :) * inv(CameraViewTransform);
+      cameraPointsInWorld(m, :) =  (D2C * cameraPointsInWorld(m, :)')' + translation;
       %transformedCamPoints(m, :) = 1/rho * St *  (cameraPoints(m, 1:3)* Rii)' + T;
     end
-      drawCamera(cameraPoints);
-      text(cameraPoints(1,1), cameraPoints(1,2), cameraPoints(1,3), prefix);
+      drawCamera(cameraPointsInWorld);
+      text(cameraPointsInWorld(1,1), cameraPointsInWorld(1,2), cameraPointsInWorld(1,3), prefix);
       hold on;
+      axis equal;
+      ax = gca;               
+      ax.Clipping = 'off';
 end
 
 

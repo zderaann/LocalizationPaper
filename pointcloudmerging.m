@@ -287,7 +287,7 @@ grid on;
 xlabel("x");
 ylabel("y");
 zlabel("z");
-title('HoloLens Depth Data without transform');
+title('HoloLens Depth Camera poses');
 %legend('\color{white} HoloLens Depth Data', '\color{white} Matterport');
 
 files=dir([folder, 'long_throw_depth/']);
@@ -295,7 +295,7 @@ depthposes = readtable([folder, 'long_throw_depth.csv']);
 
 ind = 0;
 cols = getColors(length(files));
-for i = 1:length(files)
+for i = 1:10:length(files)
    if ~startsWith(files(i).name, 'world_') && endsWith(files(i).name, '.ply')
        name = files(i).name;
        parsed = split(name, '.');
@@ -321,15 +321,17 @@ for i = 1:length(files)
 %                        0.3 -0.3 -0.3 1;
 %                        0.3 0.3 -0.3 1;
 %                        -0.3 0.3 -0.3 1];
-       cameraPoints = [eye(4,3) ones(4,1)];            
+       cameraPoints = [[diag([1 1 -1]); [0 0 0]] ones(4,1)];              
        transformedCamPoints = zeros(5,3);
        Rit = [[Rii'; 0 0 0] [0; 0; 0; 1]];
        CamTran = [[inv(CameraViewTransform(1:3, 1:3));0 0 0] [0; 0; 0; 1]];
        F2O = [[FrameToOrigin(1:3, 1:3);0 0 0] [0; 0; 0; 1]];
-       translation = FrameToOrigin(4,:) + CameraViewTransform(4,:);
+       D2C = inv(CameraViewTransform)';
+       C2D = inv(D2C);
+       translation = FrameToOrigin(4,:); %+ CameraViewTransform(4,:);
        for m = 1:4
           %cameraPoints(m, :) =  cameraPoints(m, :)  * (FrameToOrigin * CamTran);
-          cameraPoints(m, :) =  cameraPoints(m, :) * (F2O * CamTran) + translation;
+          cameraPoints(m, :) =  (D2C * cameraPoints(m, :)')' + translation;
           transformedCamPoints(m, :) = 1/rho * St *  (cameraPoints(m, 1:3)* Rii)' + T;
        end
        drawCamera(transformedCamPoints);
@@ -337,28 +339,28 @@ for i = 1:length(files)
        %cameraR = cameraR;
        %cameraT = (inv(cameraR) * cameraT')';
        cameraTT = (1/rho * St *  (cameraT * Rii)' + T)';    
-       
+       text(transformedCamPoints(1,1), transformedCamPoints(1,2), transformedCamPoints(1,3), parsed{1});
        pose = rigid3d(cameraR(1:3, 1:3),cameraTT);
-       plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.1);
+       %plotCamera('AbsolutePose',pose,'Opacity',0, 'Size', 0.1);
        %pcdepth = pcread([folder, 'long_throw_depth/00132513873764110925.ply']);
-       pcdepth = pcread([folder, 'long_throw_depth/', name]);
-       depthdata = pcdepth.Location / 1000;
-       cmatrix = ones(size(depthdata)) .* cols{i};
-       %cmatrix = ones(size(depthdata)) .* [0 1 0];
-       Rx = [1 0 0 0; 0 cos(pi) -sin(pi) 0; 0 sin(pi) cos(pi) 0; 0 0 0 1];
-       for k = 1:pcdepth.Count
-           tmp = (Rx * [depthdata(k, 1) depthdata(k, 2) depthdata(k, 3) 1]')' * (F2O * CamTran) + translation;
-
-           depthdata(k, :) = [tmp(1) tmp(2) tmp(3)];
-           %depthdata(k, :) = (cameraR(1:3, 1:3)  * depthdata(k, :)')' + cameraT(1:3);
-           depthdata(k, :) = ((1/rho * St *  (depthdata(k, :) * Rii)' + T))';
-       end
-       pcdepthtransformed = pointCloud(depthdata, 'Color', cmatrix);
-%        pcdepthtransformed = pointCloud(depthdata);
-        pcshow(pcdepthtransformed, 'MarkerSize', 50);
+%        pcdepth = pcread([folder, 'long_throw_depth/', name]);
+%        depthdata = pcdepth.Location / 1000;
+%        cmatrix = ones(size(depthdata)) .* cols{i};
+%        %cmatrix = ones(size(depthdata)) .* [0 1 0];
+%        Rx = [1 0 0 0; 0 cos(pi) -sin(pi) 0; 0 sin(pi) cos(pi) 0; 0 0 0 1];
+%        for k = 1:pcdepth.Count
+%            %tmp = (Rx * [depthdata(k, 1) depthdata(k, 2) depthdata(k, 3) 1]')' * (F2O * CamTran) + translation;
+%            tmp = (C2D * [depthdata(k, 1) depthdata(k, 2) depthdata(k, 3) 1]')' + translation;
+%            depthdata(k, :) = [tmp(1) tmp(2) tmp(3)];
+%            %depthdata(k, :) = (cameraR(1:3, 1:3)  * depthdata(k, :)')' + cameraT(1:3);
+%            depthdata(k, :) = ((1/rho * St *  (depthdata(k, :) * Rii)' + T))';
+%        end
+%        pcdepthtransformed = pointCloud(depthdata, 'Color', cmatrix);
+% %        pcdepthtransformed = pointCloud(depthdata);
+%         pcshow(pcdepthtransformed, 'MarkerSize', 50);
        hold on;
        ind = ind + 1;
-       if ind == 50
+       if ind == 10
            break
        end
    end
@@ -410,9 +412,9 @@ function drawCamera(p)
 % plot3([p(5, 1), p(2, 1)], [p(5, 2), p(2, 2)], [p(5, 3), p(2, 3)], 'r');
 
 
-plot3([p(4, 1), p(1, 1)], [p(4, 2), p(1, 2)], [p(4, 3), p(1, 3)], 'r');
-plot3([p(4, 1), p(2, 1)], [p(4, 2), p(2, 2)], [p(4, 3), p(2, 3)], 'g');
-plot3([p(4, 1), p(3, 1)], [p(4, 2), p(3, 2)], [p(4, 3), p(3, 3)], 'b');
+plot3([p(4, 1), p(1, 1)], [p(4, 2), p(1, 2)], [p(4, 3), p(1, 3)], 'r', 'LineWidth', 4);
+plot3([p(4, 1), p(2, 1)], [p(4, 2), p(2, 2)], [p(4, 3), p(2, 3)], 'g', 'LineWidth', 4);
+plot3([p(4, 1), p(3, 1)], [p(4, 2), p(3, 2)], [p(4, 3), p(3, 3)], 'b', 'LineWidth', 4);
 end
 
 
