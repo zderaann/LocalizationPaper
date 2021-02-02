@@ -208,12 +208,12 @@ hold on;
 plot3(vic(:, 1), vic(:, 2), vic(:, 3), 'ro');
 
 %% ------------------- IN MATTERPORT
-pcMatterport = pcread('D:/Documents/Work/B-315/matterport2vicon.ply');
+%pcMatterport = pcread('D:/Documents/Work/B-315/matterport2vicon.ply');
 figure();
 
 pcshowpair(pcHolCheck, pcVicom, 'MarkerSize', 50);
 hold on;
-pcshow(pcMatterport, 'MarkerSize', 50);
+%pcshow(pcMatterport, 'MarkerSize', 50);
 axis equal;
 xlabel("x");
 ylabel("y");
@@ -253,19 +253,19 @@ legend('Transformed HoloLens (without Rvic * t)','Transformed HoloLens (with Rvi
 
 %% ------------               -------- Depth data
 
-figure();
-hold on;
-matdata = pcMatterport.Location(1:10:end, :);
-matcol = pcMatterport.Color(1:10:end, :);
-pcMinMatterport = pointCloud(matdata, 'Color', matcol);
-pcshow( pcMinMatterport, 'MarkerSize', 50);
-grid on;
-xlabel("x");
-ylabel("y");
-zlabel("z");
-title('Matterport');
+% figure();
+% hold on;
+% matdata = pcMatterport.Location(1:10:end, :);
+% matcol = pcMatterport.Color(1:10:end, :);
+% pcMinMatterport = pointCloud(matdata, 'Color', matcol);
+% pcshow( pcMinMatterport, 'MarkerSize', 50);
+% grid on;
+% xlabel("x");
+% ylabel("y");
+% zlabel("z");
+% title('Matterport');
 %legend('\color{white} HoloLens Depth Data', '\color{white} Matterport');
-
+folder = './B-640/';
 files=dir([folder, 'long_throw_depth/']);
 depthposes = readtable([folder, 'long_throw_depth.csv']);
 figure();
@@ -281,6 +281,7 @@ ind = 0;
 cols = getColors(length(files));
 for i = 1:length(files)
    if ~startsWith(files(i).name, 'world_') && endsWith(files(i).name, '.ply')
+%        if ind == 10
        name = files(i).name;
        parsed = split(name, '.');
        
@@ -299,42 +300,53 @@ for i = 1:length(files)
                               row.CameraViewTransform_m31 row.CameraViewTransform_m32 row.CameraViewTransform_m33 row.CameraViewTransform_m34;
                               row.CameraViewTransform_m41 row.CameraViewTransform_m42 row.CameraViewTransform_m43 row.CameraViewTransform_m44];
       
-       cameraPoints = [[diag([1 1 1]) * 0.3; [0 0 0]] ones(4,1)];              
-       transformedCamPoints = zeros(5,3);
-       Rit = [[Rii'; 0 0 0] [0; 0; 0; 1]];
-       CamTran = [[inv(CameraViewTransform(1:3, 1:3));0 0 0] [0; 0; 0; 1]];
-       F2O = [[FrameToOrigin(1:3, 1:3);0 0 0] [0; 0; 0; 1]];
-       
-       D2C = inv(CameraViewTransform)';
-       C2D = inv(D2C);
-       translation = [FrameToOrigin(4,1) -FrameToOrigin(4,2) -FrameToOrigin(4,3) FrameToOrigin(4,4)]; %+ CameraViewTransform(4,:);
-       for m = 1:4
-          cameraPoints(m, :) =  (D2C * cameraPoints(m, :)')' + translation;
-       end
-       drawCamera(transformedCamPoints);
+%        cameraPoints = [[diag([1 1 1]) * 0.3; [0 0 0]] ones(4,1)];              
+%        transformedCamPoints = zeros(5,3);
+%        Rit = [[Rii'; 0 0 0] [0; 0; 0; 1]];
+%        CamTran = [[inv(CameraViewTransform(1:3, 1:3));0 0 0] [0; 0; 0; 1]];
+%        F2O = [[FrameToOrigin(1:3, 1:3);0 0 0] [0; 0; 0; 1]];
+%        
+%        D2C = inv(CameraViewTransform)';
+%        C2D = inv(D2C);
+%        translation = [FrameToOrigin(4,1) -FrameToOrigin(4,2) -FrameToOrigin(4,3) FrameToOrigin(4,4)]; %+ CameraViewTransform(4,:);
+
+        C2D = inv(CameraViewTransform)';
+        D2C = [C2D(1:3,1:3)' -C2D(1:3,1:3)' * C2D(1:3,4); 0 0 0 1];
+        D2O = FrameToOrigin'; 
+        O2D = inv(D2O);
+
+%        for m = 1:4
+%           cameraPoints(m, :) =  (D2C * cameraPoints(m, :)')' + translation;
+%        end
+%        drawCamera(transformedCamPoints);
   
        %text(transformedCamPoints(1,1), transformedCamPoints(1,2), transformedCamPoints(1,3), parsed{1});
        pcdepth = pcread([folder, 'long_throw_depth/', name]);
        depthdata = pcdepth.Location / 1000;
+       depthdata = depthdata*diag([-1 -1 -1]);
        %cmatrix = ones(size(depthdata)) .* cols{i};
        %cmatrix = ones(size(depthdata)) .* [0 1 0];
        Rx = [1 0 0 0; 0 cos(pi) -sin(pi) 0; 0 sin(pi) cos(pi) 0; 0 0 0 1];
        Rx3 = [1 0 0; 0 cos(pi) -sin(pi); 0 sin(pi) cos(pi)];
        for k = 1:pcdepth.Count
            
-           tmp = (D2C * ([depthdata(k, 1) depthdata(k, 2) depthdata(k, 3) 1])')' * inv(FrameToOrigin); 
+           %tmp = (D2C * ([depthdata(k, 1) depthdata(k, 2) depthdata(k, 3) 1])')' * inv(FrameToOrigin); 
+           tmp = ((D2O) * (C2D) * [depthdata(k,:) 1]')';
            depthdata(k, :) =  [tmp(1) tmp(2) tmp(3)];
            %depthdata(k, :) = ((1/rho * St *  (depthdata(k, :) * Rii)' + T))';
        end
-       pcdepthtransformed = pointCloud(depthdata);
+       cmatrix = ones(pcdepth.Count, 1) * cols{i};   
+       pcdepthtransformed = pointCloud(depthdata, 'Color', cmatrix);
        pcshow(pcdepthtransformed, 'MarkerSize', 50);
        hold on;
-       ind = ind + 1;
-%        if ind == 10
-%            break
+
+%        break;
+
 %        end
+%       ind = ind + 1;
    end
 end
+title("(D2O) * C2D * X_C")
 
 %% -------------------------------- Porovnani timestampu -------------------------------------
 pvTimestamps = pvhololens.Timestamp(croppingStart+1:end-croppingEnd);
@@ -411,5 +423,3 @@ plot3([p(4, 1), p(1, 1)], [p(4, 2), p(1, 2)], [p(4, 3), p(1, 3)], 'r', 'LineWidt
 plot3([p(4, 1), p(2, 1)], [p(4, 2), p(2, 2)], [p(4, 3), p(2, 3)], 'g', 'LineWidth', 1);
 plot3([p(4, 1), p(3, 1)], [p(4, 2), p(3, 2)], [p(4, 3), p(3, 3)], 'b', 'LineWidth', 1);
 end
-
-
